@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "385926097982",
+    "project_id": "groupwork-e02e3",
+    "storage_bucket": "groupwork-e02e3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:385926097982:android:776eba0de95c4a3f34b56f",
+        "android_client_info": {
+          "package_name": "com.example.groupwork"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9tnO_alKlTn8Ub6IKFICfop6oYBruntA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
