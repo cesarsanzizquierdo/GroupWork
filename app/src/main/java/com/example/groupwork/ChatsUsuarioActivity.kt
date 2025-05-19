@@ -1,4 +1,5 @@
 package com.example.groupwork
+
 import android.content.Intent
 import android.os.Bundle
 import android.widget.*
@@ -14,6 +15,7 @@ class ChatsUsuarioActivity : AppCompatActivity() {
     private lateinit var adapter: ArrayAdapter<String>
     private val chats = mutableListOf<String>()
     private val db = FirebaseFirestore.getInstance()
+    private lateinit var nombreUsuario: String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,17 +28,17 @@ class ChatsUsuarioActivity : AppCompatActivity() {
         adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, chats)
         listViewChats.adapter = adapter
 
-        val nombreUsuario = intent.getStringExtra("nombreUsuario") ?: "Desconocido"
+        nombreUsuario = intent.getStringExtra("nombreUsuario") ?: "Desconocido"
         tvTitulo.text = "Chats de $nombreUsuario"
 
         btnAgregarChat.setOnClickListener {
-            mostrarDialogoAgregarChat(nombreUsuario)
+            mostrarDialogoAgregarChat()
         }
 
-        cargarChats(nombreUsuario)
+        cargarChats()
     }
 
-    private fun cargarChats(nombreUsuario: String) {
+    private fun cargarChats() {
         chats.clear()
         db.collection("chats")
             .whereArrayContains("participantes", nombreUsuario)
@@ -51,13 +53,12 @@ class ChatsUsuarioActivity : AppCompatActivity() {
             .addOnFailureListener {
                 Toast.makeText(this, "Error al cargar chats", Toast.LENGTH_SHORT).show()
             }
-        listViewChats.setOnItemClickListener { _, _, position, _ ->
-            val nombreUsuario = intent.getStringExtra("nombreUsuario") ?: return@setOnItemClickListener
-            val titulo = chats[position]
 
-            // Obtener el ID del chat (más robusto: deberías usar un mapa de ID → título)
+        listViewChats.setOnItemClickListener { _, _, position, _ ->
+            val titulo = chats[position]
             db.collection("chats")
                 .whereEqualTo("titulo", titulo)
+                .whereArrayContains("participantes", nombreUsuario)
                 .get()
                 .addOnSuccessListener { result ->
                     val chatId = result.documents.firstOrNull()?.id ?: return@addOnSuccessListener
@@ -70,7 +71,7 @@ class ChatsUsuarioActivity : AppCompatActivity() {
         }
     }
 
-    private fun mostrarDialogoAgregarChat(nombreUsuario: String) {
+    private fun mostrarDialogoAgregarChat() {
         val usuariosDisponibles = mutableListOf<String>()
 
         db.collection("usuarios")
@@ -89,18 +90,24 @@ class ChatsUsuarioActivity : AppCompatActivity() {
                 }
 
                 val usuariosArray = usuariosDisponibles.toTypedArray()
-                var seleccionado: String? = null
+                val seleccionados = mutableListOf<String>()
+                val seleccionadosBool = BooleanArray(usuariosArray.size)
 
                 AlertDialog.Builder(this)
-                    .setTitle("Selecciona un usuario")
-                    .setSingleChoiceItems(usuariosArray, -1) { _, which ->
-                        seleccionado = usuariosArray[which]
+                    .setTitle("Selecciona usuarios")
+                    .setMultiChoiceItems(usuariosArray, seleccionadosBool) { _, which, isChecked ->
+                        if (isChecked) {
+                            seleccionados.add(usuariosArray[which])
+                        } else {
+                            seleccionados.remove(usuariosArray[which])
+                        }
                     }
                     .setPositiveButton("Siguiente") { _, _ ->
-                        if (seleccionado != null) {
-                            pedirNombreChat(nombreUsuario, seleccionado!!)
+                        if (seleccionados.isNotEmpty()) {
+                            seleccionados.add(nombreUsuario)
+                            pedirNombreChat(seleccionados)
                         } else {
-                            Toast.makeText(this, "Debes seleccionar un usuario", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this, "Debes seleccionar al menos un usuario", Toast.LENGTH_SHORT).show()
                         }
                     }
                     .setNegativeButton("Cancelar", null)
@@ -111,19 +118,19 @@ class ChatsUsuarioActivity : AppCompatActivity() {
             }
     }
 
-    private fun pedirNombreChat(usuario1: String, usuario2: String) {
+    private fun pedirNombreChat(participantes: List<String>) {
         val input = EditText(this)
         input.hint = "Nombre del chat"
 
         AlertDialog.Builder(this)
-            .setTitle("Nombre del chat")
+            .setTitle("Nombre del chat grupal")
             .setView(input)
             .setPositiveButton("Crear") { _, _ ->
                 val titulo = input.text.toString().trim()
                 if (titulo.isNotEmpty()) {
                     val nuevoChat = hashMapOf(
                         "titulo" to titulo,
-                        "participantes" to listOf(usuario1, usuario2),
+                        "participantes" to participantes,
                         "ultimoMensaje" to "",
                         "timestamp" to System.currentTimeMillis()
                     )
@@ -131,7 +138,7 @@ class ChatsUsuarioActivity : AppCompatActivity() {
                         .add(nuevoChat)
                         .addOnSuccessListener {
                             Toast.makeText(this, "Chat creado", Toast.LENGTH_SHORT).show()
-                            cargarChats(usuario1)
+                            cargarChats()
                         }
                         .addOnFailureListener {
                             Toast.makeText(this, "Error al crear el chat", Toast.LENGTH_SHORT).show()
